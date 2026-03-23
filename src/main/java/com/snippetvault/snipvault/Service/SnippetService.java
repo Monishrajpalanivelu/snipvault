@@ -2,6 +2,7 @@ package com.snippetvault.snipvault.Service;
 
 import com.snippetvault.snipvault.DTO.SnippetRequest;
 import com.snippetvault.snipvault.DTO.SnippetResponse;
+import com.snippetvault.snipvault.Exception.ResourceNotFound;
 import com.snippetvault.snipvault.repository.SnippetRepository;
 import jdk.jshell.Snippet;
 import com.snippetvault.snipvault.model.snippet;
@@ -29,7 +30,7 @@ public class SnippetService {
     //getById
     public SnippetResponse getSnippetById(Long id) {
         snippet snippetobj=snippetRepository.findById(id)
-                .orElseThrow(()->new RuntimeException("Snippet Not Found "+id));
+                .orElseThrow(()->new ResourceNotFound("Snippet not found with id: " + id));
         return toResponse(snippetobj);
     }
 
@@ -44,7 +45,7 @@ public class SnippetService {
     public SnippetResponse updateSnippet(Long id,SnippetRequest request) {
 
         snippet snippetobj=snippetRepository.findById(id)
-                .orElseThrow(()->new RuntimeException("Snippet Not Found "+id));
+                .orElseThrow(()->new ResourceNotFound("Snippet not found with id: " + id));
         snippetobj.setDescription(request.getDescription());
         snippetobj.setCode(request.getCode());
         snippetobj.setLanguage(request.getLanguage());
@@ -55,7 +56,7 @@ public class SnippetService {
     //delete
     public void deleteSnippet(Long id) {
         if(!snippetRepository.existsById(id)){
-            throw new RuntimeException("Snippet Not Found "+id);
+            throw new ResourceNotFound("Snippet not found with id: " + id);
         }
         snippetRepository.deleteById(id);
     }

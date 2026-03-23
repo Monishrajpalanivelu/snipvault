@@ -1,0 +1,60 @@
+/*
+
+
+DRY principle — Don't Repeat Yourself — in action. so single exception instead of multiple try-catch
+
+*/
+package com.snippetvault.snipvault.Exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.LocalDateTime;
+
+@RestControllerAdvice  /*
+
+Tells Spring: this class handles exceptions thrown anywhere in any controller.
+ One class catches errors from all 5 endpoints.
+ Without this, each controller method needs its own try-catch.
+
+*/
+public class GlobalExceptionHandler {
+
+    //snippet not found
+    @ExceptionHandler(ResourceNotFound.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFound exception) {
+        ErrorResponse error=new ErrorResponse(
+                404,
+                exception.getMessage(),
+                LocalDateTime.now()
+        );
+        return  ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+
+    }
+
+    // missing fields or invalid request body
+    @ExceptionHandler(IllegalArgumentException.class)  //Maps a specific exception type to a handler method.
+    public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException exception) {
+        ErrorResponse error=new ErrorResponse(
+                400,
+                exception.getMessage(),
+                LocalDateTime.now()
+        );
+        return  ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+
+    }
+
+    // anything unexpected
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGeneral(Exception exception) {
+
+        ErrorResponse error=new ErrorResponse(
+                500,
+                "Something went wrong. Please try again.",
+                LocalDateTime.now()
+        );
+        return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+}
