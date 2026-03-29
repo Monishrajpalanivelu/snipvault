@@ -6,12 +6,18 @@ DRY principle — Don't Repeat Yourself — in action. so single exception inste
 */
 package com.snippetvault.snipvault.Exception;
 
+import com.snippetvault.snipvault.DTO.SnippetResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice  /*
 
@@ -21,6 +27,24 @@ Tells Spring: this class handles exceptions thrown anywhere in any controller.
 
 */
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
+
+        Map<String, String> fieldErrors = new HashMap<>();
+        for(FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+            fieldErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+        String errorMessages = fieldErrors.values().stream()
+                .collect(Collectors.joining(" , "));
+        ErrorResponse response=new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                errorMessages,
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(response);
+
+    }
 
     //snippet not found
     @ExceptionHandler(ResourceNotFound.class)

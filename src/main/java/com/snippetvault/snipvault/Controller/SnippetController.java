@@ -4,6 +4,7 @@ import com.snippetvault.snipvault.DTO.SnippetRequest;
 import com.snippetvault.snipvault.DTO.SnippetResponse;
 import com.snippetvault.snipvault.Service.SnippetService;
 import com.snippetvault.snipvault.repository.SnippetRepository;
+import jakarta.validation.Valid;
 import jdk.jshell.Snippet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -33,7 +34,7 @@ public class SnippetController {
 
     // create new snippet
     @PostMapping
-    public ResponseEntity<SnippetResponse> createSnippet(@RequestBody SnippetRequest request) {
+    public ResponseEntity<SnippetResponse> createSnippet(@Valid @RequestBody SnippetRequest request) {
         return  ResponseEntity.status(HttpStatus.CREATED)
                 .body(snippetService.createSnippet(request));
 
@@ -43,7 +44,7 @@ public class SnippetController {
     //@PathVariable translate the String id in the url to long id/datatype any id
     //@requestbody Tells Spring to read the JSON from the request body and deserialise(json ->java objects) it into a SnippetRequest object automatically.
     @PutMapping("{id}")
-    public ResponseEntity<SnippetResponse> updateSnippet(@PathVariable Long id, @RequestBody SnippetRequest request) {
+    public ResponseEntity<SnippetResponse> updateSnippet(@PathVariable Long id,@Valid @RequestBody SnippetRequest request) {
 
         return   ResponseEntity.ok(snippetService.updateSnippet(id, request));
 
