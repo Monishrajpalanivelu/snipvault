@@ -4,9 +4,12 @@ import com.snippetvault.snipvault.DTO.SnippetRequest;
 import com.snippetvault.snipvault.DTO.SnippetResponse;
 import com.snippetvault.snipvault.Exception.ResourceNotFound;
 import com.snippetvault.snipvault.repository.SnippetRepository;
-import jdk.jshell.Snippet;
+
+
 import com.snippetvault.snipvault.model.snippet;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,12 +21,10 @@ public class SnippetService {
     private final SnippetRepository snippetRepository;
 
     //getAll
-    public List<SnippetResponse> getAllSnippets() {
+    public Page<SnippetResponse> getAllSnippets(Pageable pageable) {
 
-        return snippetRepository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return snippetRepository.findAll(pageable)
+                .map(this::toResponse);
 
     }
 
@@ -76,6 +77,15 @@ public class SnippetService {
                 .map(this::toResponse)
                 .collect(Collectors.toList());
 
+    }
+    // search by full text all fields
+    public Page<SnippetResponse> search(String keyword, Pageable pageable) {
+
+        if(keyword==null || keyword.isEmpty()){
+            throw new IllegalArgumentException("Search Keyword cannot be blank");
+        }
+        return snippetRepository.searchByKeyword(keyword,pageable)
+                .map(this::toResponse);
     }
 
     // - Mappers - //
