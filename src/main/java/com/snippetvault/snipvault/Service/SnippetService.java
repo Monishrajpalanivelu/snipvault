@@ -8,6 +8,8 @@ import com.snippetvault.snipvault.repository.SnippetRepository;
 
 import com.snippetvault.snipvault.model.snippet;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ public class SnippetService {
     private final SnippetRepository snippetRepository;
 
     //getAll
+    @Cacheable(value = "snippets", key = "'all::' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
     public Page<SnippetResponse> getAllSnippets(Pageable pageable) {
 
         return snippetRepository.findAll(pageable)
@@ -29,6 +32,7 @@ public class SnippetService {
     }
 
     //getById
+    @Cacheable(value = "snippets", key = "'id::' + #id")
     public SnippetResponse getSnippetById(Long id) {
         snippet snippetobj=snippetRepository.findById(id)
                 .orElseThrow(()->new ResourceNotFound("Snippet not found with id: " + id));
@@ -36,6 +40,7 @@ public class SnippetService {
     }
 
     //Create
+    @CacheEvict(value = "snippets", allEntries = true)
     public SnippetResponse createSnippet(SnippetRequest request) {
         snippet snippetobj=toEntity(request);
         snippet saved=snippetRepository.save(snippetobj);
@@ -43,6 +48,7 @@ public class SnippetService {
     }
 
     // Update
+    @CacheEvict(value = "snippets", allEntries = true)
     public SnippetResponse updateSnippet(Long id,SnippetRequest request) {
 
         snippet snippetobj=snippetRepository.findById(id)
@@ -55,6 +61,7 @@ public class SnippetService {
     }
 
     //delete
+    @CacheEvict(value = "snippets", allEntries = true)
     public void deleteSnippet(Long id) {
         if(!snippetRepository.existsById(id)){
             throw new ResourceNotFound("Snippet not found with id: " + id);
@@ -63,6 +70,7 @@ public class SnippetService {
     }
 
     //search by language
+    @Cacheable(value = "snippets", key = "'lang::' + #language")
     public List<SnippetResponse> getByLanguage(String language){
         return snippetRepository.findByLanguageIgnoreCase(language)
                 .stream()
@@ -70,15 +78,16 @@ public class SnippetService {
                 .collect(Collectors.toList());
     }
 
-    //search by keyword title
-    public List<SnippetResponse> getByTitle(String keyword){
-        return snippetRepository.findByTitleContainingIgnoreCase(keyword)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-
-    }
+//    //search by keyword title
+//    public List<SnippetResponse> getByTitle(String keyword){
+//        return snippetRepository.findByTitleContainingIgnoreCase(keyword)
+//                .stream()
+//                .map(this::toResponse)
+//                .collect(Collectors.toList());
+//
+//    }
     // search by full text all fields
+    @Cacheable(value = "snippets", key = "'search::' + #keyword + '-' + #pageable.pageNumber + '-' + #pageable.pageSize")
     public Page<SnippetResponse> search(String keyword, Pageable pageable) {
 
         if(keyword==null || keyword.isEmpty()){

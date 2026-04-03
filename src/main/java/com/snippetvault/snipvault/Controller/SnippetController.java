@@ -83,10 +83,10 @@ public class SnippetController {
 
     //search by title keyword
 
-    @GetMapping("/title")
-    public ResponseEntity<List<SnippetResponse>> getBytitle(@RequestParam String keyword) {
-        return ResponseEntity.ok(snippetService.getByTitle(keyword));
-    }
+//    @GetMapping("/title")
+//    public ResponseEntity<List<SnippetResponse>> getBytitle(@RequestParam String keyword) {
+//        return ResponseEntity.ok(snippetService.getByTitle(keyword));
+//    }
 
     // search by full text all fields
 
