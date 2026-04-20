@@ -14,7 +14,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import java.util.List;
 
 @RestController // has @Controller -> handles requests and @ResponseBody -> auto converts return values to JSON using jakson
@@ -43,9 +44,10 @@ public class SnippetController {
 
     // create new snippet
     @PostMapping
-    public ResponseEntity<SnippetResponse> createSnippet(@Valid @RequestBody SnippetRequest request) {
+    public ResponseEntity<SnippetResponse> createSnippet(@Valid @RequestBody SnippetRequest request,
+                                                         @AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(snippetService.createSnippet(request));
+                .body(snippetService.createSnippet(request, userDetails.getUsername()));
 
     }
 
@@ -53,16 +55,19 @@ public class SnippetController {
     //@PathVariable translate the String id in the url to long id/datatype any id
     //@requestbody Tells Spring to read the JSON from the request body and deserialise(json ->java objects) it into a SnippetRequest object automatically.
     @PutMapping("{id}")
-    public ResponseEntity<SnippetResponse> updateSnippet(@PathVariable Long id, @Valid @RequestBody SnippetRequest request) {
+    public ResponseEntity<SnippetResponse> updateSnippet(@PathVariable Long id,
+                                                         @Valid @RequestBody SnippetRequest request,
+                                                         @AuthenticationPrincipal UserDetails userDetails) {
 
-        return ResponseEntity.ok(snippetService.updateSnippet(id, request));
+        return ResponseEntity.ok(snippetService.updateSnippet(id, request, userDetails.getUsername()));
 
     }
 
     // delete snippet
     @DeleteMapping("{id}")
-    public ResponseEntity<SnippetResponse> deleteSnippet(@PathVariable Long id) {
-        snippetService.deleteSnippet(id);
+    public ResponseEntity<SnippetResponse> deleteSnippet(@PathVariable Long id,
+                                                         @AuthenticationPrincipal UserDetails userDetails) {
+        snippetService.deleteSnippet(id,userDetails.getUsername());
         return ResponseEntity.noContent().build();
     }
 

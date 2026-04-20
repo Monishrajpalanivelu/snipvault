@@ -13,7 +13,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import com.snippetvault.snipvault.DTO.SnippetActivityEvent;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,6 +23,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor            // Create constructor for repo and injects its bean here
 public class SnippetService {
     private final SnippetRepository snippetRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+// @RequiredArgsConstructor will auto-inject it
 
     //getAll
     @Cacheable(value = "snippets", key = "'all::' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
@@ -41,15 +45,25 @@ public class SnippetService {
 
     //Create
     @CacheEvict(value = "snippets", allEntries = true)
-    public SnippetResponse createSnippet(SnippetRequest request) {
+    public SnippetResponse createSnippet(SnippetRequest request,String username) {
         snippet snippetobj=toEntity(request);
         snippet saved=snippetRepository.save(snippetobj);
+        messagingTemplate.convertAndSend(
+                "/topic/activity",
+                new SnippetActivityEvent(
+                        "CREATED",
+                        username,
+                        saved.getTitle(),
+                        saved.getLanguage(),
+                        LocalDateTime.now()
+                )
+        );
         return toResponse(saved);
     }
 
     // Update
     @CacheEvict(value = "snippets", allEntries = true)
-    public SnippetResponse updateSnippet(Long id,SnippetRequest request) {
+    public SnippetResponse updateSnippet(Long id,SnippetRequest request,String username) {
 
         snippet snippetobj=snippetRepository.findById(id)
                 .orElseThrow(()->new ResourceNotFound("Snippet not found with id: " + id));
@@ -57,15 +71,38 @@ public class SnippetService {
         snippetobj.setCode(request.getCode());
         snippetobj.setLanguage(request.getLanguage());
         snippetobj.setTitle(request.getTitle());
-        return toResponse(snippetRepository.save(snippetobj));
+        snippet updated=snippetRepository.save(snippetobj);
+        messagingTemplate.convertAndSend(
+                "/topic/activity",
+                new SnippetActivityEvent(
+                        "UPDATED",
+                        username,
+                        updated.getTitle(),
+                        updated.getLanguage(),
+                        LocalDateTime.now()
+                )
+        );
+        return toResponse(updated);
     }
 
     //delete
     @CacheEvict(value = "snippets", allEntries = true)
-    public void deleteSnippet(Long id) {
+    public void deleteSnippet(Long id,String username) {
         if(!snippetRepository.existsById(id)){
             throw new ResourceNotFound("Snippet not found with id: " + id);
         }
+        snippet snippetobj=snippetRepository.findById(id)
+                .orElseThrow(()->new ResourceNotFound("Snippet not found with id: " + id));
+        messagingTemplate.convertAndSend(
+                "/topic/activity",
+                new SnippetActivityEvent(
+                        "DELETED",
+                        username,
+                        snippetobj.getTitle(),
+                        snippetobj.getLanguage(),
+                        LocalDateTime.now()
+                )
+        );
         snippetRepository.deleteById(id);
     }
 

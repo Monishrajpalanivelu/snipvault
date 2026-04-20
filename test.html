@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SnipVault Live Feed</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+        }
+        h2 { color: #569cd6; }
+        #feed {
+            border: 1px solid #444;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            background: #252526;
+        }
+        .event {
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .CREATED { border-color: #4ec94e; color: #4ec94e; }
+        .UPDATED { border-color: #dcdcaa; color: #dcdcaa; }
+        .DELETED { border-color: #f44747; color: #f44747; }
+        #status {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .connected { color: #4ec94e; }
+        .disconnected { color: #f44747; }
+    </style>
+</head>
+<body>
+    <h2>⚡ SnipVault Live Activity Feed</h2>
+    <div id="status" class="disconnected">● Disconnected</div>
+    <div id="feed"></div>
+
+    <script>
+        const feed = document.getElementById('feed');
+        const status = document.getElementById('status');
+
+        // Step 1: Create SockJS connection to our Spring Boot server
+        const socket = new SockJS('http://localhost:8080/ws');
+
+        // Step 2: Wrap it with STOMP
+        const stompClient = Stomp.over(socket);
+
+        // Step 3: Connect
+        stompClient.connect({}, function(frame) {
+            status.textContent = '● Connected';
+            status.className = 'connected';
+
+            // Step 4: Subscribe to the activity topic
+            stompClient.subscribe('/topic/activity', function(message) {
+                // message.body is a JSON string
+                const event = JSON.parse(message.body);
+
+                const div = document.createElement('div');
+                div.className = `event ${event.action}`;
+
+                const icons = { CREATED: '✚', UPDATED: '✎', DELETED: '✖' };
+                const icon = icons[event.action] || '•';
+
+                div.textContent = `${icon} [${event.timestamp}] ${event.username} ${event.action} "${event.snippetTitle}" (${event.language})`;
+
+                feed.prepend(div); // newest on top
+            });
+
+        }, function(error) {
+            status.textContent = '● Disconnected — is Spring Boot running?';
+            status.className = 'disconnected';
+        });
+    </script>
+</body>
+</html>
