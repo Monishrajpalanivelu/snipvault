@@ -3,6 +3,7 @@ package com.snippetvault.snipvault.Service;
 import com.snippetvault.snipvault.DTO.SnippetRequest;
 import com.snippetvault.snipvault.DTO.SnippetResponse;
 import com.snippetvault.snipvault.Exception.ResourceNotFound;
+import com.snippetvault.snipvault.Kafka.SnippetEventProducer;
 import com.snippetvault.snipvault.repository.SnippetRepository;
 
 
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
 public class SnippetService {
     private final SnippetRepository snippetRepository;
     private final SimpMessagingTemplate messagingTemplate;
-// @RequiredArgsConstructor will auto-inject it
+    private final SnippetEventProducer eventProducer;
 
     //getAll
     @Cacheable(value = "snippets", key = "'all::' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
@@ -58,6 +59,13 @@ public class SnippetService {
                         LocalDateTime.now()
                 )
         );
+        eventProducer.publishEvent(new SnippetActivityEvent(
+                "CREATED",
+                username,
+                saved.getTitle(),
+                saved.getLanguage(),
+                LocalDateTime.now()
+        ));
         return toResponse(saved);
     }
 
@@ -82,6 +90,13 @@ public class SnippetService {
                         LocalDateTime.now()
                 )
         );
+        eventProducer.publishEvent(new SnippetActivityEvent(
+                "UPDATED",
+                username,
+                updated.getTitle(),
+                updated.getLanguage(),
+                LocalDateTime.now()
+        ));
         return toResponse(updated);
     }
 
@@ -103,6 +118,13 @@ public class SnippetService {
                         LocalDateTime.now()
                 )
         );
+        eventProducer.publishEvent(new SnippetActivityEvent(
+                "DELETED",
+                username,
+                snippetobj.getTitle(),
+                snippetobj.getLanguage(),
+                LocalDateTime.now()
+        ));
         snippetRepository.deleteById(id);
     }
 
