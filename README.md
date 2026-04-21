@@ -6,6 +6,8 @@
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.3-brightgreen?style=flat-square&logo=springboot)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?style=flat-square&logo=postgresql)
 ![Redis](https://img.shields.io/badge/Redis-7-red?style=flat-square&logo=redis)
+![Kafka](https://img.shields.io/badge/Kafka-4.1.1-231F20?style=flat-square&logo=apachekafka)
+![WebSocket](https://img.shields.io/badge/WebSocket-STOMP-brightgreen?style=flat-square)
 ![JWT](https://img.shields.io/badge/Auth-JWT-black?style=flat-square&logo=jsonwebtokens)
 ![Maven](https://img.shields.io/badge/Build-Maven-C71A36?style=flat-square&logo=apachemaven)
 ![Docker](https://img.shields.io/badge/Infra-Docker-2496ED?style=flat-square&logo=docker)
@@ -32,6 +34,8 @@ Built on **Spring Boot 4** (not 3.x) — the bleeding-edge release targeting Spr
 | ORM | Spring Data JPA + Hibernate | 7.2.4 | Entity management, JPQL queries, schema management |
 | Security | Spring Security + jjwt | 7 + 0.12.6 | Stateless JWT auth, BCrypt password hashing |
 | Cache | Spring Data Redis (Lettuce) | 4.0 | Distributed caching, 10-min TTL, survives app restart |
+| Real-time | WebSockets + STOMP + SockJS | Boot 4 | Persistent connection, server-push, live activity feed |
+| Messaging | Apache Kafka | 4.1.1 | Persistent event log, consumer offset replay, async processing |
 | Database | PostgreSQL | 15 (Docker) | ACID compliant, full-text search, array types, JSONB |
 | Validation | Spring Validation | Boot 4 | @NotBlank, @Size, @Valid — request-level guards |
 | Build | Maven | 3.x | Explicit lifecycle, great for learning the build process |
@@ -46,16 +50,19 @@ com.snippetvault.snipvault/
 ├── repository/     → SnippetRepository.java, UserRepository.java
 ├── service/        → SnippetService.java, AuthService.java,
 │                     CustomUserDetailsService.java
-├── controller/     → SnippetController.java, AuthController.java
+├── controller/     → SnippetController.java, AuthController.java,
+│                     WebSocketController.java
 ├── dto/            → SnippetRequest.java, SnippetResponse.java,
 │                     RegisterRequest.java, LoginRequest.java,
-│                     AuthResponse.java
+│                     AuthResponse.java, SnippetActivityEvent.java
 ├── exception/      → ResourceNotFoundException.java,
 │                     ErrorResponse.java,
 │                     GlobalExceptionHandler.java
 ├── security/       → SecurityConfig.java, JwtUtil.java,
 │                     JwtAuthenticationFilter.java
-└── config/         → RedisConfig.java, WebConfig.java
+├── kafka/          → SnippetEventProducer.java, SnippetEventConsumer.java
+└── config/         → RedisConfig.java, WebConfig.java,
+                      WebSocketConfig.java, KafkaConfig.java
 ```
 
 **Layer responsibilities:**
@@ -64,6 +71,8 @@ com.snippetvault.snipvault/
 - **Repository** — Data access: CRUD against PostgreSQL via Spring Data JPA
 - **DTO** — Decouples API contract from DB schema; prevents entity exposure
 - **Security** — JWT filter chain, `UserDetailsService`, `SecurityConfig`
+- **Kafka** — Producer publishes events on mutations; consumer processes and logs them
+- **Config** — Infrastructure wiring: Redis, WebSocket broker, Kafka, CORS
 
 ---
 
@@ -144,6 +153,86 @@ FLUSHDB                       # Clear entire cache
 
 ---
 
+## WebSocket Live Activity Feed
+
+When any user creates, updates, or deletes a snippet, all connected clients receive an instant push notification — no polling required.
+
+**Architecture:**
+```
+POST /api/snippets
+        ↓
+SnippetService.createSnippet()
+        ↓
+SimpMessagingTemplate.convertAndSend("/topic/activity")
+        ↓
+All subscribed browser clients receive instantly
+```
+
+**Connection:**
+```javascript
+const socket = new SockJS('http://localhost:8080/ws');
+const client = Stomp.over(socket);
+client.connect({}, () => {
+    client.subscribe('/topic/activity', (msg) => {
+        const event = JSON.parse(msg.body);
+        console.log(event.action, event.username, event.snippetTitle);
+    });
+});
+```
+
+Open `http://localhost:8080/test.html` while the server is running to see the live feed in your browser.
+
+**Event payload:**
+```json
+{
+  "action": "CREATED",
+  "username": "monish",
+  "snippetTitle": "Binary Search",
+  "language": "Java",
+  "timestamp": "2026-04-21T05:28:38"
+}
+```
+
+---
+
+## Kafka Event Streaming
+
+Every snippet mutation is published to Kafka as a persistent event. Unlike WebSockets (ephemeral), Kafka stores events on disk — consumers that were offline replay all missed events when they reconnect.
+
+**Architecture:**
+```
+SnippetService
+      ↓ publishes
+snippet-events topic (Kafka broker)
+      ↓ consumed by
+SnippetEventConsumer → logs event
+```
+
+**Why both WebSockets AND Kafka?**
+They serve different layers. WebSocket delivers to currently connected browser clients in real time — ephemeral, no persistence. Kafka stores every event permanently — consumers that were offline catch up on reconnect. In production: WebSocket for the UI layer, Kafka for the service layer.
+
+**Offset replay in action:**
+```
+Consumer offline → misses 5 events
+Consumer restarts → Kafka replays all 5 from stored offset
+Consumer catches up → continues from current position
+```
+
+**Start Kafka locally:**
+```bash
+# from project root
+docker-compose up -d
+# starts: snipvault-zookeeper (2181) + snipvault-kafka (9092)
+```
+
+**Console output on snippet create:**
+```
+INFO SnippetEventProducer : Published Kafka event: CREATED - Binary Search by monish
+INFO SnippetEventConsumer : Consumed Kafka event: action=CREATED, user=monish, snippet=Binary Search, language=Java, time=2026-04-21T05:28:38
+```
+
+---
+
 ## Setup & Running Locally
 
 ### Prerequisites
@@ -164,9 +253,14 @@ docker run --name snipvault-db \
 
 docker run --name snipvault-redis -p 6379:6379 -d redis:7
 
+# Kafka + Zookeeper via docker-compose (from project root)
+docker-compose up -d
+
 # Every subsequent session
 docker start snipvault-db
 docker start snipvault-redis
+docker start snipvault-zookeeper
+docker start snipvault-kafka
 ```
 
 ### 2. IntelliJ run config
@@ -199,6 +293,10 @@ spring.data.redis.host=localhost
 spring.data.redis.port=6379
 spring.cache.type=redis
 spring.cache.redis.time-to-live=600000
+
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.consumer.group-id=snipvault-group
+spring.kafka.consumer.auto-offset-reset=earliest
 ```
 
 ---
@@ -211,27 +309,33 @@ spring.cache.redis.time-to-live=600000
 | 2 | Spring Data JPA | ✅ Complete | Repository, DTO pattern, Service CRUD, pagination, custom JPQL |
 | 3 | JWT Authentication | ✅ Complete | Spring Security 7, stateless sessions, BCrypt, JWT filter |
 | 4 | Redis Caching | ✅ Complete | @Cacheable, @CacheEvict, TTL, serialization, Redis CLI |
-| 5 | WebSockets | 🔜 Next | STOMP protocol, real-time notifications, SockJS |
-| 6 | Kafka Events | 📋 Planned | Producer/consumer, event-driven architecture, async processing |
+| 5 | WebSockets | ✅ Complete | STOMP protocol, SimpMessagingTemplate, SockJS, live feed |
+| 6 | Kafka Events | ✅ Complete | Producer/consumer, offset replay, event-driven architecture |
 
 ---
 
 ## Key Design Decisions
 
-**Why DTOs instead of exposing entities directly?**  
+**Why DTOs instead of exposing entities directly?**
 Exposing JPA entities causes infinite JSON serialization loops (bidirectional relationships), leaks internal fields (password hash, internal IDs), and tightly couples the API contract to the database schema. `SnippetRequest` controls what clients can send; `SnippetResponse` controls what clients see.
 
-**Why JWT over sessions?**  
+**Why JWT over sessions?**
 Sessions require server-side state — they don't scale horizontally without sticky sessions or a shared session store. JWT is stateless: the server only needs the secret key to verify a token. No database lookup, no memory overhead, works naturally with mobile clients and API gateways.
 
-**Why CSRF disabled?**  
+**Why CSRF disabled?**
 CSRF attacks exploit cookie-based auth. This API uses JWT in the `Authorization` header — browsers don't automatically attach headers to cross-origin requests. CSRF protection is simply not applicable here.
 
-**Why `@CacheEvict(allEntries=true)` instead of targeted key eviction?**  
+**Why `@CacheEvict(allEntries=true)` instead of targeted key eviction?**
 When a snippet changes, multiple cache entries may be stale — `id::5`, `lang::Java`, and any related search results. Tracking all affected keys adds complexity that can go out of sync. `allEntries=true` is safe, simple, and correct for a write-light system like a snippet vault.
 
-**Why `Page<T>` not cached?**  
+**Why `Page<T>` not cached?**
 `PageImpl` (Spring Data's pagination implementation) has no no-args constructor — Jackson cannot deserialize it from Redis JSON. Individual entities and `List<T>` deserialize cleanly.
+
+**Why manual `ObjectMapper` serialization for Kafka?**
+Spring Kafka 4.0 deprecated `JsonSerializer` and `JsonDeserializer`. Using `StringSerializer` on both ends with `ObjectMapper.writeValueAsString()` on produce and `objectMapper.readValue()` on consume is cleaner, has zero deprecated dependencies, and makes the serialization logic explicit and testable.
+
+**Why `@EnableKafka` and `@EnableCaching` must be explicit?**
+Spring does not scan for `@KafkaListener` or `@Cacheable` unless told to. Without `@EnableKafka`, listener methods are silently ignored — no error, no warning, just no consumers. This is deliberate Spring design — opt-in features require explicit activation.
 
 ---
 
@@ -246,9 +350,12 @@ Building on Boot 4 (not 3.x) means hitting real migration issues. Each was debug
 | 3 | `jackson-datatype-jsr310` removed as separate artifact | Now built into `jackson-databind` — removed from pom.xml |
 | 4 | `spring-boot-starter-data-jpa-test` does not exist | Use `spring-boot-starter-test` only |
 | 5 | PostgreSQL timezone error (`Asia/Calcutta`) | Added `-Duser.timezone=Asia/Kolkata` JVM arg |
-| 6 | Jackson 3 package renamed | `tools.jackson` instead of `com.fasterxml.jackson` |
+| 6 | Jackson 3 package renamed | `tools.jackson` instead of `com.fasterxml.jackson` (except `jackson-annotations`) |
 | 7 | `Page<T>` not cacheable in Redis | Cache individual entities and lists only |
 | 8 | `@EnableCaching` must be explicit | Without it, `@Cacheable` and `@CacheEvict` are silently ignored |
+| 9 | Spring Kafka `JsonSerializer` / `JsonDeserializer` deprecated in 4.0 | Use `StringSerializer` + manual `ObjectMapper` on both ends |
+| 10 | `KafkaTemplate` auto-config only registers `<String, String>` | Define `KafkaConfig` manually for `<String, Object>` types |
+| 11 | `@EnableKafka` must be explicit | Without it, `@KafkaListener` methods are silently ignored |
 
 ---
 
@@ -266,3 +373,8 @@ Building on Boot 4 (not 3.x) means hitting real migration issues. Each was debug
 - **Argon2 hashing** — stronger than BCrypt, memory-hard
 
 ---
+
+## Author
+
+**P. Monishraj** — 6th semester CSE student, Chennai  
+GitHub: [github.com/P-Monishraj](https://github.com/P-Monishraj)
