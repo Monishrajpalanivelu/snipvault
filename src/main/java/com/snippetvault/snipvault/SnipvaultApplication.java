@@ -8,7 +8,7 @@ import java.util.TimeZone;
 public class SnipvaultApplication {
 
 	public static void main(String[] args) {
-		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+		//TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 		SpringApplication.run(SnipvaultApplication.class, args);
 	}
 

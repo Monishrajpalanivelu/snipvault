@@ -21,6 +21,7 @@ import java.util.List;
 @RestController // has @Controller -> handles requests and @ResponseBody -> auto converts return values to JSON using jakson
 @RequestMapping("/api/snippets")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:3000")
 public class SnippetController {
 
     private final SnippetService snippetService;
