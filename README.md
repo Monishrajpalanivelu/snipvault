@@ -1,6 +1,6 @@
 # SnipVault
 
-> A production-style REST API for saving, tagging, searching, and managing code snippets — built to learn and demonstrate backend engineering concepts one phase at a time.
+> A production-style REST API for saving, tagging, searching, and managing code snippets.
 
 ![Java](https://img.shields.io/badge/Java-21_LTS-orange?style=flat-square&logo=openjdk)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.3-brightgreen?style=flat-square&logo=springboot)
@@ -14,16 +14,6 @@
 
 ---
 
-## What Is This?
-
-SnipVault is a **learning-first backend project**. Each phase adds exactly one new backend concept on top of the previous — the goal is not just to ship features, but to understand every annotation, every design decision, and every trade-off.
-
-Built on **Spring Boot 4** (not 3.x) — the bleeding-edge release targeting Spring Framework 7 + Jakarta EE 11. This means hitting real breaking changes and learning to read release notes and migrate — a skill that matters at every senior level.
-
-**Goal 1:** Land a paid backend internship  
-**Goal 2:** FAANG placement after graduation
-
----
 
 ## Tech Stack
 
